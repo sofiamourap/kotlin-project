@@ -1,0 +1,24 @@
+ktor:
+  deployment:
+    port: 8080
+  application:
+    # ONE entry: the fully-qualified name of the module function.
+    # microportfolio -> package
+    # ApplicationKt   -> the JVM class Kotlin generates for Application.kt
+    # module          -> fun Application.module() inside that file
+    modules:
+      - microportfolio.ApplicationKt.module
+
+# Custom (non-Ktor) config lives at the top level, next to `ktor`, and is read
+# with environment.config.config("jwt") / ("database").
+# $VAR:-default means "use the env var if set, otherwise the default".
+jwt:
+  secret: "$JWT_SECRET:change-this-secret-in-production"
+  issuer: "micro-portfolio"
+  audience: "portfolio-api"
+  realm: "Micro Portfolio API"
+
+database:
+  url: "$DATABASE_URL:jdbc:postgresql://localhost:5432/portfolio"
+  user: "$DATABASE_USER:postgres"
+  password: "$DATABASE_PASSWORD:postgres"

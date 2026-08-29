@@ -1,0 +1,11 @@
+# Test-only config, loaded explicitly by ApplicationTest via
+# ApplicationConfig("test-application.yaml").
+# Deliberately named differently from the main application.yaml so there is no
+# doubt about which file a test is using, and deliberately has no
+# `ktor.application.modules`: each test installs the plugins it needs, so tests
+# never open a database connection.
+jwt:
+  secret: "test-secret"
+  issuer: "micro-portfolio"
+  audience: "portfolio-api"
+  realm: "Micro Portfolio API"
