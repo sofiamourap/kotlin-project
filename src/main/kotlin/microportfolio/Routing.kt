@@ -3,6 +3,7 @@ package microportfolio
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationCall
+import io.ktor.server.application.log
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.jwt.JWTPrincipal
 import io.ktor.server.auth.principal
@@ -20,6 +21,9 @@ import microportfolio.domain.Users
 import microportfolio.domain.findHoldingsByUserId
 import microportfolio.domain.holdingQuantity
 import microportfolio.domain.insertPendingOrder
+import microportfolio.kafka.NoOpOrderEventPublisher
+import microportfolio.kafka.OrderEventPublisher
+import microportfolio.kafka.OrderPlaced
 import microportfolio.orders.OrderValidation
 import microportfolio.orders.validateOrder
 import microportfolio.plugins.AUTH_JWT
@@ -48,7 +52,7 @@ data class RegisterResponse(val id: String, val email: String)
 @Serializable
 data class PortfolioResponse(val userId: String?, val holdings: List<HoldingResponse> = emptyList())
 
-fun Application.configureRouting() {
+fun Application.configureRouting(publisher: OrderEventPublisher = NoOpOrderEventPublisher) {
     val jwtSettings = JwtSettings.from(environment.config)
     val quotes = FakeQuoteService()
 
@@ -143,6 +147,25 @@ fun Application.configureRouting() {
                                 quantity = result.quantity,
                                 price = result.price,
                             )
+                        }
+                        try {
+                            publisher.publish(
+                                OrderPlaced(
+                                    orderId = orderId.toString(),
+                                    userId = userId.toString(),
+                                    symbol = result.symbol,
+                                    side = result.side.name,
+                                    quantity = result.quantity.toPlainString(),
+                                    price = result.price.toPlainString(),
+                                ),
+                            )
+                        } catch (e: Exception) {
+                            call.application.log.error("Failed to publish OrderPlaced", e)
+                            call.respond(
+                                HttpStatusCode.ServiceUnavailable,
+                                mapOf("error" to "Order saved but event could not be published"),
+                            )
+                            return@post
                         }
                         call.respond(
                             HttpStatusCode.Accepted,

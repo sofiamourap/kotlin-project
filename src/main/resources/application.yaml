@@ -22,3 +22,7 @@ database:
   url: "$DATABASE_URL:jdbc:postgresql://localhost:5432/portfolio"
   user: "$DATABASE_USER:postgres"
   password: "$DATABASE_PASSWORD:postgres"
+
+kafka:
+  bootstrapServers: "$KAFKA_BOOTSTRAP_SERVERS:localhost:9092"
+  orderPlacedTopic: "$KAFKA_ORDER_TOPIC:order-placed"

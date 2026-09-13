@@ -1,8 +1,9 @@
 package microportfolio
 
+import io.ktor.server.application.Application
+import microportfolio.kafka.KafkaOrderEventPublisher
 import microportfolio.plugins.configureDatabase
 import microportfolio.plugins.configureSecurity
-import io.ktor.server.application.Application
 
 /**
  * The single application module referenced from application.yaml.
@@ -14,5 +15,6 @@ fun Application.module() {
     configureSerialization() // app.use(json())
     configureStatusPages() // app.use(errorHandler)
     configureSecurity() // app.use(jwt) + jsonwebtoken.sign
-    configureRouting() // app.get/post/put/delete/etc.
+    val publisher = KafkaOrderEventPublisher.from(environment.config, this)
+    configureRouting(publisher)
 }

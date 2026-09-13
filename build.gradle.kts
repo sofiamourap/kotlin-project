@@ -45,6 +45,7 @@ dependencies {
     implementation(libs.exposed.core) // SQL DSL
     implementation(libs.exposed.jdbc)
     implementation(libs.exposed.java.time) // datetime / CurrentDateTime columns
+    implementation(libs.kafka.clients)
 
     // --- Logging -------------------------------------------------------
     implementation(libs.logback.classic)
