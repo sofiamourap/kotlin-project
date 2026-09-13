@@ -36,11 +36,15 @@ dependencies {
     // to the ktor-version-catalog version in settings.gradle.kts.
     implementation("io.ktor:ktor-server-auth-jwt:${libs.versions.ktor.get()}")
 
+    // BCrypt for password hashing.
+    implementation("org.mindrot:jbcrypt:0.4")
+
     // --- Persistence ---------------------------------------------------
     implementation(libs.postgresql)   // JDBC driver
     implementation(libs.hikaricp)     // connection pool
     implementation(libs.exposed.core) // SQL DSL
     implementation(libs.exposed.jdbc)
+    implementation(libs.exposed.java.time) // datetime / CurrentDateTime columns
 
     // --- Logging -------------------------------------------------------
     implementation(libs.logback.classic)

@@ -1,18 +1,16 @@
 package microportfolio
 
-import microportfolio.plugins.configureSecurity
 import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.post
-import io.ktor.client.request.setBody
-import io.ktor.client.statement.bodyAsText
-import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.config.ApplicationConfig
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
-import kotlinx.serialization.json.Json
+import microportfolio.plugins.JwtSettings
+import microportfolio.plugins.configureSecurity
+import microportfolio.plugins.createToken
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -48,19 +46,21 @@ class ApplicationTest {
     }
 
     @Test
-    fun `login issues a token that opens portfolio`() = testApplication {
+    fun `orders requires a token`() = testApplication {
         installTestApp()
+        assertEquals(HttpStatusCode.Unauthorized, client.post("/orders").status)
+    }
 
-        val login = client.post("/auth/login") {
-            header(HttpHeaders.ContentType, ContentType.Application.Json.toString())
-            setBody("""{"email":"me@example.com","password":"irrelevant-for-now"}""")
-        }
-        assertEquals(HttpStatusCode.OK, login.status)
-
-        val token = Json.decodeFromString<LoginResponse>(login.bodyAsText()).token
+    @Test
+    fun `malformed userId in token returns 400`() = testApplication {
+        installTestApp()
+        val token = createToken(
+            userId = "not-a-uuid",
+            settings = JwtSettings.from(ApplicationConfig("test-application.yaml")),
+        )
         val portfolio = client.get("/portfolio") {
             header(HttpHeaders.Authorization, "Bearer $token")
         }
-        assertEquals(HttpStatusCode.OK, portfolio.status)
+        assertEquals(HttpStatusCode.BadRequest, portfolio.status)
     }
 }

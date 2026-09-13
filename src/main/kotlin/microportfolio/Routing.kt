@@ -1,10 +1,8 @@
 package microportfolio
 
-import microportfolio.plugins.AUTH_JWT
-import microportfolio.plugins.JwtSettings
-import microportfolio.plugins.createToken
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
+import io.ktor.server.application.ApplicationCall
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.jwt.JWTPrincipal
 import io.ktor.server.auth.principal
@@ -14,9 +12,26 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.routing
 import kotlinx.serialization.Serializable
-
-@Serializable
-data class RegisterRequest(val email: String, val password: String)
+import microportfolio.domain.HoldingResponse
+import microportfolio.domain.OrderStatus
+import microportfolio.domain.PlaceOrderRequest
+import microportfolio.domain.PlaceOrderResponse
+import microportfolio.domain.Users
+import microportfolio.domain.findHoldingsByUserId
+import microportfolio.domain.holdingQuantity
+import microportfolio.domain.insertPendingOrder
+import microportfolio.orders.OrderValidation
+import microportfolio.orders.validateOrder
+import microportfolio.plugins.AUTH_JWT
+import microportfolio.plugins.JwtSettings
+import microportfolio.plugins.createToken
+import microportfolio.quotes.FakeQuoteService
+import org.jetbrains.exposed.v1.core.eq
+import org.jetbrains.exposed.v1.jdbc.insertAndGetId
+import org.jetbrains.exposed.v1.jdbc.selectAll
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
+import org.mindrot.jbcrypt.BCrypt
+import kotlin.uuid.Uuid
 
 @Serializable
 data class LoginRequest(val email: String, val password: String)
@@ -24,8 +39,18 @@ data class LoginRequest(val email: String, val password: String)
 @Serializable
 data class LoginResponse(val token: String)
 
+@Serializable
+data class RegisterRequest(val email: String, val password: String)
+
+@Serializable
+data class RegisterResponse(val id: String, val email: String)
+
+@Serializable
+data class PortfolioResponse(val userId: String?, val holdings: List<HoldingResponse> = emptyList())
+
 fun Application.configureRouting() {
     val jwtSettings = JwtSettings.from(environment.config)
+    val quotes = FakeQuoteService()
 
     routing {
         get("/health") {
@@ -34,21 +59,110 @@ fun Application.configureRouting() {
 
         post("/auth/register") {
             val request = call.receive<RegisterRequest>()
-            // TODO: hash the password and insert a Users row before responding.
-            call.respond(HttpStatusCode.Created, mapOf("email" to request.email))
+            if (request.email.isBlank() || request.password.isBlank()) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Email and password are required"))
+                return@post
+            }
+
+            val existing = transaction {
+                Users.selectAll().where { Users.email eq request.email }.count()
+            }
+            if (existing > 0) {
+                call.respond(HttpStatusCode.Conflict, mapOf("error" to "Email already registered"))
+                return@post
+            }
+
+            val passwordHash = BCrypt.hashpw(request.password, BCrypt.gensalt())
+            val userId = transaction {
+                // it syntax: is the argument of the lambda function. should be used for simple functions with a single argument.
+                Users.insertAndGetId {
+                    it[email] = request.email
+                    it[Users.passwordHash] = passwordHash
+                }
+            }
+
+            call.respond(
+                HttpStatusCode.Created,
+                RegisterResponse(id = userId.value.toString(), email = request.email),
+            )
         }
 
         post("/auth/login") {
             val request = call.receive<LoginRequest>()
-            // TODO: look the user up and verify the password hash.
-            call.respond(LoginResponse(token = createToken(userId = request.email, settings = jwtSettings)))
+            if (request.email.isBlank() || request.password.isBlank()) {
+                call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Email and password are required"))
+                return@post
+            }
+
+            val user = transaction {
+                Users.selectAll().where { Users.email eq request.email }.firstOrNull()
+            }
+            if (user == null || !BCrypt.checkpw(request.password, user[Users.passwordHash])) {
+                call.respond(HttpStatusCode.Unauthorized, mapOf("error" to "Invalid credentials"))
+                return@post
+            }
+
+            val token = createToken(
+                userId = user[Users.id].value.toString(),
+                settings = jwtSettings,
+            )
+            call.respond(LoginResponse(token = token))
         }
 
         authenticate(AUTH_JWT) {
             get("/portfolio") {
-                val userId = call.principal<JWTPrincipal>()?.payload?.getClaim("userId")?.asString()
-                call.respond(mapOf("userId" to userId))
+                val userId = jwtUserId(call) ?: run {
+                    call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid user id"))
+                    return@get
+                }
+
+                val holdings = transaction { findHoldingsByUserId(userId) }
+                call.respond(PortfolioResponse(userId = userId.toString(), holdings = holdings))
+            }
+
+            post("/orders") {
+                val userId = jwtUserId(call) ?: run {
+                    call.respond(HttpStatusCode.BadRequest, mapOf("error" to "Invalid user id"))
+                    return@post
+                }
+
+                val request = call.receive<PlaceOrderRequest>()
+                val quotePrice = quotes.priceFor(request.symbol)
+                val heldQuantity = transaction { holdingQuantity(userId, request.symbol.trim().uppercase()) }
+
+                when (val result = validateOrder(request.symbol, request.side, request.quantity, quotePrice, heldQuantity)) {
+                    is OrderValidation.Invalid -> {
+                        call.respond(HttpStatusCode.BadRequest, mapOf("error" to result.message))
+                    }
+                    is OrderValidation.Valid -> {
+                        val orderId = transaction {
+                            insertPendingOrder(
+                                userId = userId,
+                                symbol = result.symbol,
+                                side = result.side,
+                                quantity = result.quantity,
+                                price = result.price,
+                            )
+                        }
+                        call.respond(
+                            HttpStatusCode.Accepted,
+                            PlaceOrderResponse(
+                                orderId = orderId.toString(),
+                                status = OrderStatus.PENDING.name,
+                                symbol = result.symbol,
+                                side = result.side.name,
+                                quantity = result.quantity.toPlainString(),
+                                price = result.price.toPlainString(),
+                            ),
+                        )
+                    }
+                }
             }
         }
     }
+}
+
+private fun jwtUserId(call: ApplicationCall): Uuid? {
+    val raw = call.principal<JWTPrincipal>()?.payload?.getClaim("userId")?.asString()
+    return raw?.let { runCatching { Uuid.parse(it) }.getOrNull() }
 }

@@ -11,8 +11,8 @@ import io.ktor.server.application.Application
  */
 fun Application.module() {
     configureDatabase()
-    configureSerialization()
-    configureStatusPages()
-    configureSecurity()
-    configureRouting()
+    configureSerialization() // app.use(json())
+    configureStatusPages() // app.use(errorHandler)
+    configureSecurity() // app.use(jwt) + jsonwebtoken.sign
+    configureRouting() // app.get/post/put/delete/etc.
 }
