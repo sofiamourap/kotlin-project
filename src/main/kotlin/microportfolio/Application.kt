@@ -2,6 +2,7 @@ package microportfolio
 
 import io.ktor.server.application.Application
 import microportfolio.kafka.KafkaOrderEventPublisher
+import microportfolio.kafka.startOrderPlacedConsumer
 import microportfolio.plugins.configureDatabase
 import microportfolio.plugins.configureSecurity
 
@@ -17,4 +18,5 @@ fun Application.module() {
     configureSecurity() // app.use(jwt) + jsonwebtoken.sign
     val publisher = KafkaOrderEventPublisher.from(environment.config, this)
     configureRouting(publisher)
+    startOrderPlacedConsumer() // start the consumer for the order placed event
 }

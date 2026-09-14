@@ -26,3 +26,4 @@ database:
 kafka:
   bootstrapServers: "$KAFKA_BOOTSTRAP_SERVERS:localhost:9092"
   orderPlacedTopic: "$KAFKA_ORDER_TOPIC:order-placed"
+  consumerGroup: "$KAFKA_CONSUMER_GROUP:micro-portfolio-holdings"
