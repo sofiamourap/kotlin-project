@@ -5,6 +5,7 @@ import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
+import microportfolio.plugins.configureObservability
 import io.ktor.server.config.ApplicationConfig
 import io.ktor.server.testing.ApplicationTestBuilder
 import io.ktor.server.testing.testApplication
@@ -26,6 +27,7 @@ class ApplicationTest {
             config = ApplicationConfig("test-application.yaml")
         }
         application {
+            configureObservability()
             configureSerialization()
             configureStatusPages()
             configureSecurity()
@@ -37,6 +39,16 @@ class ApplicationTest {
     fun `health endpoint returns UP`() = testApplication {
         installTestApp()
         assertEquals(HttpStatusCode.OK, client.get("/health").status)
+    }
+
+    @Test
+    fun `health echoes X-Request-Id`() = testApplication {
+        installTestApp()
+        val response = client.get("/health") {
+            header(HttpHeaders.XRequestId, "test-request-id")
+        }
+        assertEquals(HttpStatusCode.OK, response.status)
+        assertEquals("test-request-id", response.headers[HttpHeaders.XRequestId])
     }
 
     @Test

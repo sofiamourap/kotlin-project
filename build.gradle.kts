@@ -31,6 +31,8 @@ dependencies {
     implementation(ktorLibs.server.statusPages)
     implementation(ktorLibs.server.auth)
     implementation(ktorLibs.serialization.kotlinx.json)
+    implementation("io.ktor:ktor-server-call-id:${libs.versions.ktor.get()}")
+    implementation("io.ktor:ktor-server-call-logging:${libs.versions.ktor.get()}")
 
     // JWT support. Version comes from libs.versions.toml, which is kept equal
     // to the ktor-version-catalog version in settings.gradle.kts.

@@ -4,6 +4,7 @@ import io.ktor.server.application.Application
 import microportfolio.kafka.KafkaOrderEventPublisher
 import microportfolio.kafka.startOrderPlacedConsumer
 import microportfolio.plugins.configureDatabase
+import microportfolio.plugins.configureObservability
 import microportfolio.plugins.configureSecurity
 
 /**
@@ -12,6 +13,7 @@ import microportfolio.plugins.configureSecurity
  * authenticate("auth-jwt").
  */
 fun Application.module() {
+    configureObservability()
     configureDatabase()
     configureSerialization() // app.use(json())
     configureStatusPages() // app.use(errorHandler)

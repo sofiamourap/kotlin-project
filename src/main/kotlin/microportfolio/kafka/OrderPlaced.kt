@@ -11,4 +11,5 @@ data class OrderPlaced(
     val side: String,
     val quantity: String,
     val price: String,
+    val requestId: String = "",
 )

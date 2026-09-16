@@ -7,6 +7,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import microportfolio.domain.applyOrderPlaced
+import org.slf4j.MDC
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.clients.consumer.KafkaConsumer
 import org.apache.kafka.common.errors.WakeupException
@@ -42,8 +43,13 @@ fun Application.startOrderPlacedConsumer() {
                 for (record in records) {
                     try {
                         val event = Json.decodeFromString<OrderPlaced>(record.value())
-                        applyOrderPlaced(event)
-                        log.info("Applied order ${event.orderId} (${event.side} ${event.quantity} ${event.symbol})")
+                        MDC.put("requestId", event.requestId.ifBlank { "--" })
+                        try {
+                            applyOrderPlaced(event)
+                            log.info("Applied order ${event.orderId} (${event.side} ${event.quantity} ${event.symbol})")
+                        } finally {
+                            MDC.remove("requestId")
+                        }
                     } catch (e: Exception) {
                         log.error("Failed to apply OrderPlaced: ${record.value()}", e)
                     }

@@ -4,6 +4,7 @@ import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.Application
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.log
+import io.ktor.server.plugins.callid.callId
 import io.ktor.server.auth.authenticate
 import io.ktor.server.auth.jwt.JWTPrincipal
 import io.ktor.server.auth.principal
@@ -157,6 +158,7 @@ fun Application.configureRouting(publisher: OrderEventPublisher = NoOpOrderEvent
                                     side = result.side.name,
                                     quantity = result.quantity.toPlainString(),
                                     price = result.price.toPlainString(),
+                                    requestId = call.callId.orEmpty(),
                                 ),
                             )
                         } catch (e: Exception) {
