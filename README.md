@@ -33,6 +33,16 @@ Ktor API ──► Postgres (users, orders PENDING, portfolios)
 
 Correlation: `X-Request-Id` on the HTTP call is copied onto the event and into consumer logs (`requestId=...`).
 
+## Demo
+
+`docker compose up --build`:
+
+![Build and start the stack](docs/build_demo.gif)
+
+`./scripts/demo.sh` (register, login, BUY, portfolio):
+
+![Demo script](docs/script_demo.gif)
+
 ## Run
 
 **All-in-one (API + Postgres + Kafka):**
